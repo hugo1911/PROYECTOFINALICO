@@ -8,3 +8,4 @@ python-dotenv==1.0.1
 reactpy==1.1.0
 sentence-transformers==5.5.1
 uvicorn==0.48.0
+starlette==0.46.2

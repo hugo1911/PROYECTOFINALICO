@@ -351,6 +351,36 @@ body {
   background: #2e4358;
 }
 
+.btn-submit:disabled {
+  background: #8a8170;
+  cursor: not-allowed;
+}
+
+.btn-secondary {
+  background: transparent;
+  color: #6c5f49;
+  border: 1px solid #c8bfa8;
+  padding: 8px 14px;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  border-radius: 1px;
+  transition: background 0.2s, color 0.2s;
+  font-family: 'Georgia', serif;
+}
+
+.btn-secondary:hover {
+  background: #f4f1eb;
+  color: #1c2b3a;
+}
+
+.input-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .response-area {
   flex: 1;
   background: #fff;
@@ -360,6 +390,57 @@ body {
   box-shadow: 0 1px 4px rgba(0,0,0,0.06);
   display: flex;
   flex-direction: column;
+}
+
+.conversation-stream {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.message-row {
+  display: flex;
+}
+
+.message-row.user {
+  justify-content: flex-end;
+}
+
+.message-row.assistant {
+  justify-content: flex-start;
+}
+
+.chat-message {
+  max-width: 72%;
+  border: 1px solid #d8ccb3;
+  padding: 12px 14px;
+  line-height: 1.55;
+  font-size: 0.88rem;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+
+.message-row.user .chat-message {
+  background: #1c2b3a;
+  border-color: #1c2b3a;
+  color: #e8e0d0;
+}
+
+.message-row.assistant .chat-message {
+  background: #fbfaf7;
+  color: #2d2922;
+}
+
+.message-label {
+  display: block;
+  margin-bottom: 5px;
+  font-size: 0.58rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #8a7a5e;
+}
+
+.message-row.user .message-label {
+  color: #c8a96e;
 }
 
 .response-placeholder {
@@ -392,6 +473,54 @@ body {
   height: 1px;
   background: #c8bfa8;
   margin: 4px auto;
+}
+
+.sources-panel {
+  margin-top: 18px;
+  border-top: 1px solid #e0d6c4;
+  padding-top: 14px;
+}
+
+.sources-title {
+  font-size: 0.62rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #8a7a5e;
+  margin-bottom: 8px;
+}
+
+.sources-empty {
+  font-size: 0.78rem;
+  color: #b0a090;
+  font-style: italic;
+}
+
+.source-list {
+  list-style: none;
+  display: grid;
+  gap: 8px;
+}
+
+.source-item {
+  border-left: 3px solid #c8a96e;
+  background: #fbfaf7;
+  padding: 8px 10px;
+}
+
+.source-name {
+  display: block;
+  font-size: 0.78rem;
+  color: #1c2b3a;
+  line-height: 1.35;
+}
+
+.source-score {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.62rem;
+  color: #8a7a5e;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 /*  FOOTER  */
@@ -501,59 +630,188 @@ def Sidebar():
     )
 
 
+def build_mock_answer(question: str) -> str:
+    return (
+        "Respuesta simulada: el backend RAG aun no esta conectado en esta vista. "
+        "Cuando se integre, esta pregunta se enviara al recuperador y se respondera "
+        f"con base en los documentos CETYS relacionados con: \"{question}\"."
+    )
+
+
+def build_mock_sources() -> list[dict[str, str]]:
+    return [
+        {
+            "name": "Reglamento Institucional de Educacion Superior",
+            "score": "simulado 0.91",
+        },
+        {
+            "name": "Codigo de Honor Sistema CETYS",
+            "score": "simulado 0.84",
+        },
+    ]
+
+
+@component
+def EmptyState():
+    return html.div(
+        {"className": "response-placeholder"},
+        html.span({"className": "big-label"}, "Sin mensajes aun"),
+        html.div({"className": "divider-ornament"}),
+        html.p(
+            {"className": "desc"},
+            "Escribe una pregunta para ver aqui la conversacion simulada "
+            "y las fuentes que recuperaria el asistente.",
+        ),
+    )
+
+
+@component
+def ChatMessage(role, content):
+    label = "Usuario" if role == "user" else "Asistente"
+    return html.div(
+        {"className": f"message-row {role}"},
+        html.div(
+            {"className": "chat-message"},
+            html.span({"className": "message-label"}, label),
+            html.div({}, content),
+        ),
+    )
+
+
+@component
+def MessageList(messages):
+    if not messages:
+        return EmptyState()
+
+    rendered_messages = [
+        ChatMessage(
+            key=f"{index}-{message['role']}",
+            role=message["role"],
+            content=message["content"],
+        )
+        for index, message in enumerate(messages)
+    ]
+    return html.div({"className": "conversation-stream"}, *rendered_messages)
+
+
+@component
+def SourcesPanel(sources):
+    if not sources:
+        return html.div(
+            {"className": "sources-panel"},
+            html.div({"className": "sources-title"}, "Fuentes recuperadas"),
+            html.div(
+                {"className": "sources-empty"},
+                "Aun no hay fuentes para mostrar.",
+            ),
+        )
+
+    source_items = [
+        html.li(
+            {"className": "source-item", "key": source["name"]},
+            html.span({"className": "source-name"}, source["name"]),
+            html.span({"className": "source-score"}, source["score"]),
+        )
+        for source in sources
+    ]
+    return html.div(
+        {"className": "sources-panel"},
+        html.div({"className": "sources-title"}, "Fuentes recuperadas"),
+        html.ul({"className": "source-list"}, *source_items),
+    )
+
+
+@component
+def InputControls(text, on_change, on_submit, on_clear, has_messages):
+    return html.div(
+        {"className": "query-box"},
+        html.textarea(
+            {
+                "placeholder": "Escriba su pregunta sobre los reglamentos institucionales...",
+                "value": text,
+                "onChange": on_change,
+                "rows": 4,
+            }
+        ),
+        html.div(
+            {"className": "query-footer"},
+            html.span(
+                {"className": "query-hint"},
+                "Respuesta simulada hasta conectar el backend RAG",
+            ),
+            html.div(
+                {"className": "input-actions"},
+                html.button(
+                    {
+                        "className": "btn-secondary",
+                        "onClick": on_clear,
+                        "disabled": not has_messages and not text.strip(),
+                    },
+                    "Limpiar",
+                ),
+                html.button(
+                    {
+                        "className": "btn-submit",
+                        "onClick": on_submit,
+                        "disabled": not text.strip(),
+                    },
+                    "Enviar",
+                ),
+            ),
+        ),
+    )
+
+
 @component
 def QueryPanel():
     text, set_text = hooks.use_state("")
+    messages, set_messages = hooks.use_state([])
+    sources, set_sources = hooks.use_state([])
 
     def on_change(event):
         set_text(event["target"]["value"])
 
     def on_submit(event):
-        pass  # conexion al backend 
+        question = text.strip()
+        if not question:
+            return
+
+        answer = build_mock_answer(question)
+        set_messages(
+            messages
+            + [
+                {"role": "user", "content": question},
+                {"role": "assistant", "content": answer},
+            ]
+        )
+        set_sources(build_mock_sources())
+        set_text("")
+
+    def on_clear(event):
+        set_text("")
+        set_messages([])
+        set_sources([])
 
     return html.div(
         {"className": "main-area"},
         html.div(
             {},
             html.div({"className": "query-section-label"}, "Consulta"),
-            html.div(
-                {"className": "query-box"},
-                html.textarea(
-                    {
-                        "placeholder": "Escriba su pregunta sobre los reglamentos institucionales...",
-                        "value": text,
-                        "onChange": on_change,
-                        "rows": 4,
-                    }
-                ),
-                html.div(
-                    {"className": "query-footer"},
-                    html.span(
-                        {"className": "query-hint"},
-                        "La consulta sera procesada por el motor RAG",
-                    ),
-                    html.button(
-                        {"className": "btn-submit", "onClick": on_submit},
-                        "Consultar",
-                    ),
-                ),
+            InputControls(
+                text=text,
+                on_change=on_change,
+                on_submit=on_submit,
+                on_clear=on_clear,
+                has_messages=bool(messages),
             ),
         ),
         html.div(
             {"style": {"flex": "1", "display": "flex", "flexDirection": "column"}},
-            html.div({"className": "query-section-label"}, "Respuesta"),
+            html.div({"className": "query-section-label"}, "Conversacion"),
             html.div(
                 {"className": "response-area"},
-                html.div(
-                    {"className": "response-placeholder"},
-                    html.span({"className": "big-label"}, "Sin respuesta aun"),
-                    html.div({"className": "divider-ornament"}),
-                    html.p(
-                        {"className": "desc"},
-                        "La respuesta del asistente aparecera aqui una vez "
-                        "que se conecte el backend RAG en la siguiente etapa.",
-                    ),
-                ),
+                MessageList(messages=messages),
+                SourcesPanel(sources=sources),
             ),
         ),
     )

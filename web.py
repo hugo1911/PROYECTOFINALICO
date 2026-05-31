@@ -1,20 +1,88 @@
+import os
+import glob as globmod
 from reactpy import component, html, hooks
 from reactpy.backend.starlette import configure
 from starlette.applications import Starlette
 
 
-CORPUS_DOCS = [
-    ("Codigo de Honor", "Etica institucional"),
-    ("Reglamento Estacionamiento 2021", "Accesos y regulacion"),
-    ("Reglamento Lic. Escolarizada 2012-2013", "Normativa estudiantil"),
-    ("Reglamento Lic. Escolarizada 2024-2025", "Normativa estudiantil"),
-    ("Reglamento Lic. Escolarizada 2025-2026", "Normativa estudiantil"),
-    ("Reglamento Lic. Trimestral 2025-2026", "Normativa estudiantil"),
-    ("Reglamento Institucional Dic. 2024", "Educacion superior"),
-    ("Reglamento Practicas Profesionales", "Vinculacion"),
-    ("Reglamento Servicio Social Lic. 2024", "Servicio social"),
-    ("Titulacion Automatica Lic. 2023", "Egreso"),
+DATA_DIR = "data/notes"
+
+
+TYPE_RULES = [
+    ("Codigo-Honor",        "Codigo de Honor"),
+    ("Estacionamiento",     "Reglamento — Estacionamiento"),
+    ("Practicas",           "Reglamento — Practicas Profesionales"),
+    ("Servicio-Social",     "Reglamento — Servicio Social"),
+    ("Titulacion",          "Reglamento — Titulacion"),
+    ("Trimestral",          "Reglamento — Modalidad Trimestral"),
+    ("Institucional",       "Reglamento — Institucional"),
+    ("Estudiantes",         "Reglamento — Estudiantes Lic."),
 ]
+
+ACCENT_MAP = str.maketrans(
+    "aeiouAEIOUnN",
+    "aeiouAEIOUnN",
+)
+
+
+def strip_accents(text: str) -> str:
+    """Reemplaza vocales con acento por su version sin acento."""
+    replacements = {
+        "a": "a", "e": "e", "i": "i", "o": "o", "u": "u",
+        "A": "A", "E": "E", "I": "I", "O": "O", "U": "U",
+        "n": "n", "N": "N",
+    }
+    result = []
+    for ch in text:
+        result.append(replacements.get(ch, ch))
+    return "".join(result)
+
+
+def filename_to_label(filename: str) -> str:
+    """Convierte CETYS_Reglamento-Foo-Bar-2024.txt en 'Reglamento Foo Bar 2024'."""
+    name = filename.replace("CETYS_", "").replace(".txt", "")
+    name = name.replace("-", " ")
+    return strip_accents(name)
+
+
+def detect_type(filename: str) -> str:
+    for keyword, label in TYPE_RULES:
+        if keyword in filename:
+            return strip_accents(label)
+    return "Documento"
+
+
+def load_corpus_summary(data_dir: str = DATA_DIR) -> dict:
+    """
+    Escanea data_dir y devuelve:
+      - total: numero de archivos .txt
+      - types: conjunto de tipos detectados
+      - docs: lista de dicts {name, type, size_kb}
+    No instancia modelos ni llama al LLM.
+    """
+    pattern = os.path.join(data_dir, "*.txt")
+    files = sorted(globmod.glob(pattern))
+
+    docs = []
+    types_seen = set()
+
+    for path in files:
+        fname = os.path.basename(path)
+        size_kb = round(os.path.getsize(path) / 1024, 1)
+        doc_type = detect_type(fname)
+        label = filename_to_label(fname)
+        types_seen.add(doc_type)
+        docs.append({"name": label, "type": doc_type, "size_kb": size_kb, "path": path})
+
+    return {
+        "total": len(docs),
+        "types": sorted(types_seen),
+        "docs": docs,
+    }
+
+
+# CSS
+
 
 CSS = """
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -29,7 +97,6 @@ body {
 .app-shell {
   display: grid;
   grid-template-rows: auto 1fr auto;
-  grid-template-columns: 1fr;
   min-height: 100vh;
 }
 
@@ -82,7 +149,7 @@ body {
 /*  BODY  */
 .app-body {
   display: grid;
-  grid-template-columns: 260px 1fr;
+  grid-template-columns: 280px 1fr;
   overflow: hidden;
 }
 
@@ -97,25 +164,78 @@ body {
 }
 
 .sidebar-title {
-  padding: 18px 20px 10px;
-  font-size: 0.65rem;
+  padding: 16px 20px 10px;
+  font-size: 0.62rem;
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: #c8a96e;
   border-bottom: 1px solid #2e4358;
-  font-family: 'Georgia', serif;
+}
+
+/*  Resumen de corpus  */
+.corpus-summary {
+  padding: 12px 20px;
+  border-bottom: 1px solid #2e4358;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.summary-stat {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.72rem;
+}
+
+.summary-stat .label {
+  color: #8fa8b8;
+  letter-spacing: 0.04em;
+}
+
+.summary-stat .value {
+  color: #dce8f0;
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+
+.types-list {
+  margin-top: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.type-badge {
+  font-size: 0.62rem;
+  color: #7a9ab0;
+  padding: 2px 0;
+  letter-spacing: 0.03em;
+  border-left: 2px solid #c8a96e;
+  padding-left: 7px;
+}
+
+/*  Lista de documentos  */
+.section-label {
+  padding: 10px 20px 6px;
+  font-size: 0.58rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #5a7a90;
+  border-bottom: 1px solid #253548;
 }
 
 .doc-list {
   list-style: none;
-  padding: 8px 0;
+  padding: 4px 0;
+  flex: 1;
 }
 
 .doc-item {
-  padding: 10px 20px;
-  border-bottom: 1px solid #253548;
+  padding: 9px 20px;
+  border-bottom: 1px solid #1a2838;
   cursor: default;
-  transition: background 0.15s;
+  transition: background 0.12s;
 }
 
 .doc-item:hover {
@@ -123,25 +243,34 @@ body {
 }
 
 .doc-name {
-  font-size: 0.78rem;
+  font-size: 0.74rem;
   color: #dce8f0;
-  line-height: 1.3;
+  line-height: 1.35;
 }
 
-.doc-category {
-  font-size: 0.65rem;
-  color: #8fa8b8;
-  margin-top: 2px;
+.doc-meta {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 3px;
+}
+
+.doc-type {
+  font-size: 0.61rem;
+  color: #7a9ab0;
   font-style: italic;
 }
 
-.corpus-count {
-  padding: 12px 20px;
-  font-size: 0.65rem;
-  color: #5a7a90;
+.doc-size {
+  font-size: 0.61rem;
+  color: #4a6070;
+}
+
+.corpus-footer {
+  padding: 10px 20px;
+  font-size: 0.62rem;
+  color: #4a6070;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  margin-top: auto;
   border-top: 1px solid #2e4358;
 }
 
@@ -156,14 +285,13 @@ body {
 }
 
 .query-section-label {
-  font-size: 0.65rem;
+  font-size: 0.62rem;
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: #8a7a5e;
   margin-bottom: 6px;
 }
 
-/*  INPUT BOX  */
 .query-box {
   background: #fff;
   border: 1px solid #c8bfa8;
@@ -223,7 +351,6 @@ body {
   background: #2e4358;
 }
 
-/*  RESPONSE PLACEHOLDER  */
 .response-area {
   flex: 1;
   background: #fff;
@@ -242,12 +369,11 @@ body {
   align-items: center;
   justify-content: center;
   gap: 10px;
-  color: #b0a090;
   text-align: center;
 }
 
 .response-placeholder .big-label {
-  font-size: 0.7rem;
+  font-size: 0.68rem;
   letter-spacing: 0.18em;
   text-transform: uppercase;
   color: #c8bfa8;
@@ -281,10 +407,7 @@ body {
 }
 """
 
-
-
 # COMPONENTS
-
 
 @component
 def StyleInjector():
@@ -302,24 +425,78 @@ def AppHeader():
 
 
 @component
-def SidebarDocItem(name, category):
+def CorpusSummary(total, types):
+    type_badges = [
+        html.div({"className": "type-badge", "key": t}, t)
+        for t in types
+    ]
+    return html.div(
+        {"className": "corpus-summary"},
+        html.div(
+            {"className": "summary-stat"},
+            html.span({"className": "label"}, "Total de documentos"),
+            html.span({"className": "value"}, str(total)),
+        ),
+        html.div(
+            {"className": "summary-stat"},
+            html.span({"className": "label"}, "Tipos detectados"),
+            html.span({"className": "value"}, str(len(types))),
+        ),
+        html.div({"className": "types-list"}, *type_badges),
+    )
+
+
+@component
+def DocItem(name, doc_type, size_kb):
     return html.li(
         {"className": "doc-item"},
         html.div({"className": "doc-name"}, name),
-        html.div({"className": "doc-category"}, category),
+        html.div(
+            {"className": "doc-meta"},
+            html.span({"className": "doc-type"}, doc_type),
+            html.span({"className": "doc-size"}, f"{size_kb} KB"),
+        ),
     )
 
 
 @component
 def Sidebar():
-    items = [SidebarDocItem(n, c) for n, c in CORPUS_DOCS]
+    summary, set_summary = hooks.use_state(None)
+
+    @hooks.use_effect
+    def fetch_corpus():
+        data = load_corpus_summary()
+        set_summary(data)
+
+    if summary is None:
+        return html.aside(
+            {"className": "sidebar"},
+            html.div({"className": "sidebar-title"}, "Corpus — Documentos"),
+            html.div(
+                {"style": {"padding": "20px", "fontSize": "0.75rem", "color": "#5a7a90"}},
+                "Cargando corpus...",
+            ),
+        )
+
+    doc_items = [
+        DocItem(
+            key=d["path"],
+            name=d["name"],
+            doc_type=d["type"],
+            size_kb=d["size_kb"],
+        )
+        for d in summary["docs"]
+    ]
+
     return html.aside(
         {"className": "sidebar"},
         html.div({"className": "sidebar-title"}, "Corpus — Documentos"),
-        html.ul({"className": "doc-list"}, *items),
+        CorpusSummary(total=summary["total"], types=summary["types"]),
+        html.div({"className": "section-label"}, "Reglamentos indexados"),
+        html.ul({"className": "doc-list"}, *doc_items),
         html.div(
-            {"className": "corpus-count"},
-            f"{len(CORPUS_DOCS)} documentos indexados",
+            {"className": "corpus-footer"},
+            f"Directorio: {DATA_DIR}",
         ),
     )
 
@@ -332,7 +509,7 @@ def QueryPanel():
         set_text(event["target"]["value"])
 
     def on_submit(event):
-        pass  # backend connection — next step
+        pass  # conexion al backend 
 
     return html.div(
         {"className": "main-area"},

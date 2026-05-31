@@ -1,0 +1,10 @@
+anthropic==0.105.2
+faiss-cpu==1.13.2
+langchain-core==1.4.0
+langchain-text-splitters==1.1.2
+numpy==1.26.4
+openai==2.37.0
+python-dotenv==1.0.1
+reactpy==1.1.0
+sentence-transformers==5.5.1
+uvicorn==0.48.0

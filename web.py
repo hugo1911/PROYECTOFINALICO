@@ -9,8 +9,7 @@ from rag import Assistant, load_config_from_env
 
 DATA_DIR = "data/notes"
 
-# Inicializamos una sola vez para no recargar embeddings en cada render.
-try:
+ try:
     _assistant: Assistant | None = Assistant.from_config(load_config_from_env())
     _init_error: str | None = None
 except Exception as _e:
@@ -155,6 +154,9 @@ body {
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: #e8e0d0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .app-header .subtitle {
@@ -162,6 +164,9 @@ body {
   color: #8fa8b8;
   font-style: italic;
   letter-spacing: 0.04em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .status-dot {
@@ -173,6 +178,8 @@ body {
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: #7fc48a;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .status-dot::before {
@@ -192,6 +199,11 @@ body {
   min-height: 0;
 }
 
+/* Evita que columnas de grid se desborden hacia afuera */
+.app-body > * {
+  min-width: 0;
+}
+
 /*  Barra lateral  */
 .sidebar {
   background: #1e2d3d;
@@ -200,6 +212,7 @@ body {
   flex-direction: column;
   border-right: 1px solid #2e4358;
   overflow-y: auto;
+  min-width: 0;
 }
 
 .sidebar-title {
@@ -252,6 +265,9 @@ body {
   letter-spacing: 0.03em;
   border-left: 2px solid #c8a96e;
   padding-left: 7px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /*  Lista de documentos  */
@@ -285,23 +301,30 @@ body {
   font-size: 0.74rem;
   color: #dce8f0;
   line-height: 1.35;
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 
 .doc-meta {
   display: flex;
   justify-content: space-between;
   margin-top: 3px;
+  gap: 6px;
 }
 
 .doc-type {
   font-size: 0.61rem;
   color: #7a9ab0;
   font-style: italic;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .doc-size {
   font-size: 0.61rem;
   color: #4a6070;
+  flex-shrink: 0;
 }
 
 .corpus-footer {
@@ -311,6 +334,9 @@ body {
   letter-spacing: 0.06em;
   text-transform: uppercase;
   border-top: 1px solid #2e4358;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /*  Area principal  */
@@ -321,6 +347,7 @@ body {
   padding: 32px 40px;
   gap: 24px;
   overflow-y: auto;
+  min-width: 0;
 }
 
 .query-section-label {
@@ -353,6 +380,8 @@ body {
   resize: none;
   line-height: 1.6;
   min-height: 80px;
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 
 .query-box textarea::placeholder {
@@ -386,6 +415,7 @@ body {
   border-radius: 1px;
   transition: background 0.2s;
   font-family: 'Georgia', serif;
+  white-space: nowrap;
 }
 
 .btn-submit:hover {
@@ -409,6 +439,7 @@ body {
   border-radius: 1px;
   transition: background 0.2s, color 0.2s;
   font-family: 'Georgia', serif;
+  white-space: nowrap;
 }
 
 .btn-secondary:hover {
@@ -431,6 +462,8 @@ body {
   box-shadow: 0 1px 4px rgba(0,0,0,0.06);
   display: flex;
   flex-direction: column;
+  min-width: 0;
+  overflow-y: auto;
 }
 
 .conversation-stream {
@@ -441,6 +474,7 @@ body {
 
 .message-row {
   display: flex;
+  min-width: 0;
 }
 
 .message-row.user {
@@ -453,11 +487,15 @@ body {
 
 .chat-message {
   max-width: 72%;
+  min-width: 0;
   border: 1px solid #d8ccb3;
   padding: 12px 14px;
   line-height: 1.55;
   font-size: 0.88rem;
   box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  overflow-wrap: break-word;
+  word-break: break-word;
+  white-space: pre-wrap;
 }
 
 .message-row.user .chat-message {
@@ -478,6 +516,7 @@ body {
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: #8a7a5e;
+  white-space: nowrap;
 }
 
 .message-row.user .message-label {
@@ -546,6 +585,7 @@ body {
   border-left: 3px solid #c8a96e;
   background: #fbfaf7;
   padding: 8px 10px;
+  min-width: 0;
 }
 
 .source-title {
@@ -554,6 +594,8 @@ body {
   color: #1c2b3a;
   line-height: 1.35;
   font-weight: 700;
+  overflow-wrap: break-word;
+  word-break: break-word;
 }
 
 .source-meta {
@@ -562,6 +604,7 @@ body {
   font-size: 0.66rem;
   color: #6c5f49;
   line-height: 1.35;
+  overflow-wrap: break-word;
 }
 
 .source-file {
@@ -569,7 +612,7 @@ body {
   margin-top: 2px;
   font-size: 0.62rem;
   color: #8a7a5e;
-  word-break: break-word;
+  word-break: break-all;
 }
 
 .source-score {
@@ -618,6 +661,9 @@ body {
   padding: 10px 32px;
   border-top: 1px solid #2e4358;
   text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* Boton limpiar conversacion — estado deshabilitado mas claro */
@@ -696,7 +742,10 @@ body {
 
 @component
 def StyleInjector():
-    return html.style({}, CSS)
+     return html._(
+        html.meta({"name": "viewport", "content": "width=device-width, initial-scale=1.0"}),
+        html.style({}, CSS),
+    )
 
 
 @component

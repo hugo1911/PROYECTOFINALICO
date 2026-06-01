@@ -216,7 +216,6 @@ SYSTEM_PROMPT = (
 
 
 def format_context(results: list[dict]) -> str:
-    # Ponemos los chunks recuperados en un formato facil de meter al prompt.
     context_parts = []
 
     for result in results:
@@ -329,8 +328,7 @@ class Assistant:
         """Genera una respuesta usando contexto recuperado e historial."""
         search_k = k or self.top_k
 
-        # Antes de responder buscamos que pedazos de documentos tengan relacion con la pregunta
-        relevant_chunks = retrieve(
+         relevant_chunks = retrieve(
             question,
             self.index,
             self.model,
@@ -344,8 +342,7 @@ class Assistant:
         context = format_context(relevant_chunks)
         messages = build_messages(question, context, self.history)
 
-        # Aqui llamamos al LLM con el contexto ya armado.
-        completion = self.client.chat.completions.create(
+         completion = self.client.chat.completions.create(
             model=self.llm_model,
             messages=messages,
             temperature=0.2,
@@ -358,8 +355,7 @@ class Assistant:
 
 
 
-        # guardamos pregunta y respuesta para los siguientes turnos
-        self.history.append({"role": "user", "content": question})
+         self.history.append({"role": "user", "content": question})
         self.history.append({"role": "assistant", "content": answer})
         
         return answer

@@ -9,7 +9,7 @@ from rag import Assistant, load_config_from_env
 
 DATA_DIR = "data/notes"
 
- try:
+try:
     _assistant: Assistant | None = Assistant.from_config(load_config_from_env())
     _init_error: str | None = None
 except Exception as _e:

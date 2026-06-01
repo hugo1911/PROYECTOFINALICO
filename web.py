@@ -614,6 +614,12 @@ body {
   border-top: 1px solid #2e4358;
   text-transform: uppercase;
 }
+
+/* Boton limpiar conversacion — estado deshabilitado mas claro */
+.btn-secondary:disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+}
 """
 
 # Componentes de ReactPy.
@@ -805,6 +811,11 @@ def SourcesPanel(sources):
 @component
 def InputControls(text, on_change, on_submit, on_clear, has_messages, loading):
     hint = "Buscando en documentos CETYS..." if loading else "Asistente RAG conectado"
+
+    clear_disabled = loading or (not has_messages and not text.strip())
+
+    submit_disabled = loading or not text.strip()
+
     return html.div(
         {"className": "query-box"},
         html.textarea(
@@ -825,7 +836,8 @@ def InputControls(text, on_change, on_submit, on_clear, has_messages, loading):
                     {
                         "className": "btn-secondary",
                         "onClick": on_clear,
-                        "disabled": loading or (not has_messages and not text.strip()),
+                        "disabled": clear_disabled,
+                        "title": "Limpiar conversacion y reiniciar historial",
                     },
                     "Limpiar",
                 ),
@@ -833,7 +845,7 @@ def InputControls(text, on_change, on_submit, on_clear, has_messages, loading):
                     {
                         "className": "btn-submit",
                         "onClick": on_submit,
-                        "disabled": loading or not text.strip(),
+                        "disabled": submit_disabled,
                     },
                     "Buscando..." if loading else "Enviar",
                 ),
@@ -857,7 +869,6 @@ def QueryPanel():
         if not question or loading:
             return
 
-        # Primero pintamos la pregunta; la respuesta y fuentes llegan asincronas.
         user_msg = {"role": "user", "content": question}
         msgs_with_user = messages + [user_msg]
         set_text("")
@@ -872,10 +883,10 @@ def QueryPanel():
         if loading:
             return
 
-        # Limpiar tambien borra el historial del asistente real.
         set_text("")
         set_messages([])
         set_sources([])
+        
         if _assistant is not None:
             _assistant.clear_history()
 

@@ -1,11 +1,20 @@
+import asyncio
 import os
 import glob as globmod
 from reactpy import component, html, hooks
 from reactpy.backend.starlette import configure
 from starlette.applications import Starlette
+from rag import Assistant, load_config_from_env
 
 
 DATA_DIR = "data/notes"
+
+try:
+    _assistant: Assistant | None = Assistant.from_config(load_config_from_env())
+    _init_error: str | None = None
+except Exception as _e:
+    _assistant = None
+    _init_error = str(_e)
 
 
 TYPE_RULES = [
@@ -79,6 +88,32 @@ def load_corpus_summary(data_dir: str = DATA_DIR) -> dict:
         "types": sorted(types_seen),
         "docs": docs,
     }
+
+
+async def _run_query(
+    question: str,
+    msgs_snapshot: list,
+    set_messages,
+    set_sources,
+    set_loading,
+) -> None:
+    """Runs Assistant.ask_with_sources in a thread pool and updates UI state."""
+    loop = asyncio.get_running_loop()
+    try:
+        if _assistant is None:
+            raise RuntimeError(_init_error or "El asistente no pudo inicializarse.")
+        answer, new_sources = await loop.run_in_executor(
+            None, lambda: _assistant.ask_with_sources(question)
+        )
+        set_messages(msgs_snapshot + [{"role": "assistant", "content": answer}])
+        set_sources(new_sources)
+    except Exception as exc:
+        set_messages(msgs_snapshot + [
+            {"role": "error", "content": f"Error al consultar el asistente: {exc}"}
+        ])
+        set_sources([])
+    finally:
+        set_loading(False)
 
 
 # CSS
@@ -523,6 +558,33 @@ body {
   text-transform: uppercase;
 }
 
+/*  ERROR MESSAGES  */
+.message-row.error .chat-message {
+  background: #fff4f4;
+  border-color: #e8b0b0;
+  color: #7a2020;
+}
+
+.message-row.error .message-label {
+  color: #c05050;
+}
+
+/*  SEARCHING INDICATOR  */
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.2; }
+}
+
+.searching-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #c8a96e;
+  margin-right: 8px;
+  animation: blink 1.2s ease-in-out infinite;
+}
+
 /*  FOOTER  */
 .app-footer {
   background: #1c2b3a;
@@ -630,26 +692,6 @@ def Sidebar():
     )
 
 
-def build_mock_answer(question: str) -> str:
-    return (
-        "Respuesta simulada: el backend RAG aun no esta conectado en esta vista. "
-        "Cuando se integre, esta pregunta se enviara al recuperador y se respondera "
-        f"con base en los documentos CETYS relacionados con: \"{question}\"."
-    )
-
-
-def build_mock_sources() -> list[dict[str, str]]:
-    return [
-        {
-            "name": "Reglamento Institucional de Educacion Superior",
-            "score": "simulado 0.91",
-        },
-        {
-            "name": "Codigo de Honor Sistema CETYS",
-            "score": "simulado 0.84",
-        },
-    ]
-
 
 @component
 def EmptyState():
@@ -659,21 +701,37 @@ def EmptyState():
         html.div({"className": "divider-ornament"}),
         html.p(
             {"className": "desc"},
-            "Escribe una pregunta para ver aqui la conversacion simulada "
-            "y las fuentes que recuperaria el asistente.",
+            "Escribe una pregunta para consultar los reglamentos institucionales de CETYS.",
         ),
     )
 
 
 @component
 def ChatMessage(role, content):
-    label = "Usuario" if role == "user" else "Asistente"
+    labels = {"user": "Usuario", "assistant": "Asistente", "error": "Error"}
+    label = labels.get(role, role)
     return html.div(
         {"className": f"message-row {role}"},
         html.div(
             {"className": "chat-message"},
             html.span({"className": "message-label"}, label),
             html.div({}, content),
+        ),
+    )
+
+
+@component
+def SearchingMessage():
+    return html.div(
+        {"className": "message-row assistant"},
+        html.div(
+            {"className": "chat-message"},
+            html.span({"className": "message-label"}, "Asistente"),
+            html.div(
+                {},
+                html.span({"className": "searching-dot"}),
+                "Buscando en documentos...",
+            ),
         ),
     )
 
@@ -722,7 +780,8 @@ def SourcesPanel(sources):
 
 
 @component
-def InputControls(text, on_change, on_submit, on_clear, has_messages):
+def InputControls(text, on_change, on_submit, on_clear, has_messages, loading):
+    hint = "Buscando en documentos CETYS..." if loading else "Asistente RAG conectado"
     return html.div(
         {"className": "query-box"},
         html.textarea(
@@ -731,21 +790,19 @@ def InputControls(text, on_change, on_submit, on_clear, has_messages):
                 "value": text,
                 "onChange": on_change,
                 "rows": 4,
+                "disabled": loading,
             }
         ),
         html.div(
             {"className": "query-footer"},
-            html.span(
-                {"className": "query-hint"},
-                "Respuesta simulada hasta conectar el backend RAG",
-            ),
+            html.span({"className": "query-hint"}, hint),
             html.div(
                 {"className": "input-actions"},
                 html.button(
                     {
                         "className": "btn-secondary",
                         "onClick": on_clear,
-                        "disabled": not has_messages and not text.strip(),
+                        "disabled": loading or (not has_messages and not text.strip()),
                     },
                     "Limpiar",
                 ),
@@ -753,9 +810,9 @@ def InputControls(text, on_change, on_submit, on_clear, has_messages):
                     {
                         "className": "btn-submit",
                         "onClick": on_submit,
-                        "disabled": not text.strip(),
+                        "disabled": loading or not text.strip(),
                     },
-                    "Enviar",
+                    "Buscando..." if loading else "Enviar",
                 ),
             ),
         ),
@@ -767,30 +824,33 @@ def QueryPanel():
     text, set_text = hooks.use_state("")
     messages, set_messages = hooks.use_state([])
     sources, set_sources = hooks.use_state([])
+    loading, set_loading = hooks.use_state(False)
 
     def on_change(event):
         set_text(event["target"]["value"])
 
     def on_submit(event):
         question = text.strip()
-        if not question:
+        if not question or loading:
             return
-
-        answer = build_mock_answer(question)
-        set_messages(
-            messages
-            + [
-                {"role": "user", "content": question},
-                {"role": "assistant", "content": answer},
-            ]
-        )
-        set_sources(build_mock_sources())
+        user_msg = {"role": "user", "content": question}
+        msgs_with_user = messages + [user_msg]
         set_text("")
+        set_loading(True)
+        set_sources([])
+        set_messages(msgs_with_user)
+        asyncio.get_event_loop().create_task(
+            _run_query(question, msgs_with_user, set_messages, set_sources, set_loading)
+        )
 
     def on_clear(event):
+        if loading:
+            return
         set_text("")
         set_messages([])
         set_sources([])
+        if _assistant is not None:
+            _assistant.clear_history()
 
     return html.div(
         {"className": "main-area"},
@@ -803,6 +863,7 @@ def QueryPanel():
                 on_submit=on_submit,
                 on_clear=on_clear,
                 has_messages=bool(messages),
+                loading=loading,
             ),
         ),
         html.div(
@@ -811,6 +872,7 @@ def QueryPanel():
             html.div(
                 {"className": "response-area"},
                 MessageList(messages=messages),
+                SearchingMessage() if loading else None,
                 SourcesPanel(sources=sources),
             ),
         ),

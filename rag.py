@@ -340,6 +340,39 @@ class Assistant:
         
         return answer
 
+    def ask_with_sources(self, question: str, k: int | None = None) -> tuple[str, list[dict]]:
+        """Like ask() but also returns retrieved source metadata for UI display."""
+        search_k = k or self.top_k
+        relevant_chunks = retrieve(question, self.index, self.model, self.chunks, search_k)
+
+        if not relevant_chunks:
+            return "No tengo suficiente información en los documentos para responder eso.", []
+
+        context = format_context(relevant_chunks)
+        msgs = build_messages(question, context, self.history)
+
+        completion = self.client.chat.completions.create(
+            model=self.llm_model,
+            messages=msgs,
+            temperature=0.2,
+        )
+
+        answer = completion.choices[0].message.content
+        if not answer:
+            answer = "No tengo suficiente información en los documentos para responder eso."
+
+        self.history.append({"role": "user", "content": question})
+        self.history.append({"role": "assistant", "content": answer})
+
+        sources = [
+            {
+                "name": os.path.basename(c["metadata"]["path"]),
+                "score": f"similitud {c['score']:.3f}",
+            }
+            for c in relevant_chunks
+        ]
+        return answer, sources
+
     def clear_history(self) -> None:
         """Empties the conversation history."""
         self.history.clear()

@@ -97,6 +97,37 @@ def _parse_int_setting(name: str, value: Any) -> int:
     return resolved
 
 
+ 
+NORMATIVE_KEYWORDS = [
+    "Reglamento",
+    "Codigo-Honor",
+    "Codigo Honor",
+    "Normativo",
+    "Institucional",
+]
+
+
+def build_metadata(file_path: str, folder_name: str, document_type: str) -> dict:
+    """Construye metadatos enriquecidos para un documento del corpus.
+
+    Agrega title, source_name, folder, document_type e is_regulation
+    a partir del nombre del archivo y la carpeta de origen.
+    """
+    filename = os.path.basename(file_path)
+     title = filename.removesuffix(".txt").removeprefix("CETYS_").replace("-", " ").replace("_", " ")
+     source_name = filename.removesuffix(".txt")
+     is_regulation = any(kw in filename for kw in NORMATIVE_KEYWORDS)
+
+    return {
+        "path": file_path,
+        "document_type": document_type,
+        "title": title,
+        "source_name": source_name,
+        "folder": folder_name,
+        "is_regulation": is_regulation,
+    }
+
+
 def load_documents(data_dir: str = DEFAULT_DATA_DIR) -> list[Document]:
     """Carga los .txt del corpus y les agrega metadatos basicos."""
     documents: list[Document] = []
@@ -111,10 +142,7 @@ def load_documents(data_dir: str = DEFAULT_DATA_DIR) -> list[Document]:
              documents.append(
                 Document(
                     page_content=text,
-                    metadata={
-                        "path": file_path,
-                        "document_type": document_type,
-                    },
+                    metadata=build_metadata(file_path, folder_name, document_type),
                 )
             )
 
@@ -127,8 +155,7 @@ def split_documents(
         chunk_overlap: int = DEFAULT_CHUNK_OVERLAP,
 ) -> list[Document]:
     """Parte documentos en chunks con traslape conservando metadatos."""
-    # Aqui usamos los valores que llegaron de la configuracion, no numeros fijos.
-    text_splitter = RecursiveCharacterTextSplitter(
+     text_splitter = RecursiveCharacterTextSplitter(
         chunk_size=chunk_size,
         chunk_overlap=chunk_overlap,
     )
@@ -216,6 +243,7 @@ SYSTEM_PROMPT = (
 
 
 def format_context(results: list[dict]) -> str:
+    # Ponemos los chunks recuperados en un formato facil de meter al prompt.
     context_parts = []
 
     for result in results:
@@ -342,7 +370,8 @@ class Assistant:
         context = format_context(relevant_chunks)
         messages = build_messages(question, context, self.history)
 
-         completion = self.client.chat.completions.create(
+        # Aqui llamamos al LLM con el contexto ya armado.
+        completion = self.client.chat.completions.create(
             model=self.llm_model,
             messages=messages,
             temperature=0.2,

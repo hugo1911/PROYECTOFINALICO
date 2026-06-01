@@ -41,6 +41,23 @@ NORMATIVE_KEYWORDS = [
     "Institucional",
 ]
 
+HISTORY_QUERY_PATTERNS = [
+    r"acab[ao]s?\s+de\s+preguntar",
+    r"acab[oé]\s+de\s+preguntar",
+    r"qu[eé]\s+(me\s+)?(respondiste|contestaste|dijiste)",
+    r"cu[aá]l\s+fue\s+(tu\s+)?(respuesta|contestaci[oó]n)",
+    r"cu[aá]l\s+fue\s+(mi\s+)?pregunta",
+    r"(qu[eé]|lo\s+que)\s+(te\s+)?pregunt[eé]",
+    r"qu[eé]\s+te\s+hab[ií]a\s+preguntado",
+    r"repite\s+(lo\s+que\s+)?(dijiste|respondiste|contestaste)",
+    r"de\s+qu[eé]\s+(hemos|estamos)\s+hablado",
+    r"resum(e|ir?)\s+(la\s+)?(nuestra\s+)?conversaci[oó]n",
+    r"qu[eé]\s+hemos\s+(estado\s+)?hablando",
+    r"(mi|tu)\s+[uú]ltima\s+(pregunta|respuesta)",
+    r"lo\s+que\s+(me\s+)?respondiste",
+    r"lo\s+que\s+(me\s+)?dijiste",
+]
+
 STOPWORDS = {
     "a",
     "al",
@@ -253,6 +270,11 @@ def tokenize(text: str) -> list[str]:
     return [token for token in tokens if len(token) > 2 and token not in STOPWORDS]
 
 
+def is_history_query(question: str) -> bool:
+    text = question.lower()
+    return any(re.search(pattern, text) for pattern in HISTORY_QUERY_PATTERNS)
+
+
 def build_keyword_index(chunks: list[Document]) -> KeywordIndex:
     """Arma un indice invertido simple para consultas por palabras clave."""
     if not chunks:
@@ -433,6 +455,12 @@ SYSTEM_PROMPT = (
     "suficiente informacion en los reglamentos disponibles."
 )
 
+HISTORY_SYSTEM_PROMPT = (
+    "Eres un asistente institucional de CETYS Universidad. "
+    "El usuario te esta preguntando sobre el historial de esta conversacion. "
+    "Responde basandote unicamente en lo que ya se ha dicho en la conversacion actual."
+)
+
 
 def format_context(results: list[dict]) -> str:
     context_parts = []
@@ -465,6 +493,16 @@ def build_messages(
         }
     )
 
+    return messages
+
+
+def build_history_messages(
+    question: str,
+    history: list[dict[str, str]],
+) -> list[dict[str, str]]:
+    messages = [{"role": "system", "content": HISTORY_SYSTEM_PROMPT}]
+    messages.extend(history)
+    messages.append({"role": "user", "content": question})
     return messages
 
 
@@ -564,6 +602,18 @@ class Assistant:
 
     def ask(self, question: str, k: int | None = None) -> str:
         """Genera una respuesta usando contexto recuperado e historial."""
+        if is_history_query(question):
+            if not self.history:
+                answer = "No hay historial de conversacion todavia."
+            else:
+                messages = build_history_messages(question, self.history)
+                answer = self._answer_from_llm(messages)
+                if not answer:
+                    answer = "No pude recuperar el historial de la conversacion."
+            self.history.append({"role": "user", "content": question})
+            self.history.append({"role": "assistant", "content": answer})
+            return answer
+
         relevant_chunks = self._retrieve_context(question, k)
 
         if not relevant_chunks:
@@ -583,6 +633,18 @@ class Assistant:
 
     def ask_with_sources(self, question: str, k: int | None = None) -> tuple[str, list[dict]]:
         """Responde y regresa las fuentes recuperadas para pintarlas en la UI."""
+        if is_history_query(question):
+            if not self.history:
+                answer = "No hay historial de conversacion todavia."
+            else:
+                messages = build_history_messages(question, self.history)
+                answer = self._answer_from_llm(messages)
+                if not answer:
+                    answer = "No pude recuperar el historial de la conversacion."
+            self.history.append({"role": "user", "content": question})
+            self.history.append({"role": "assistant", "content": answer})
+            return answer, []
+
         relevant_chunks = self._retrieve_context(question, k)
 
         if not relevant_chunks:

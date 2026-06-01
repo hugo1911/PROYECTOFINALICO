@@ -9,6 +9,7 @@ from rag import Assistant, load_config_from_env
 
 DATA_DIR = "data/notes"
 
+# Inicializamos una sola vez para no recargar embeddings en cada render.
 try:
     _assistant: Assistant | None = Assistant.from_config(load_config_from_env())
     _init_error: str | None = None
@@ -97,7 +98,7 @@ async def _run_query(
     set_sources,
     set_loading,
 ) -> None:
-    """Runs Assistant.ask_with_sources in a thread pool and updates UI state."""
+    """Manda la pregunta al RAG sin congelar la interfaz."""
     loop = asyncio.get_running_loop()
     try:
         if _assistant is None:
@@ -116,7 +117,7 @@ async def _run_query(
         set_loading(False)
 
 
-# CSS
+# Estilos de la interfaz.
 
 
 CSS = """
@@ -135,7 +136,7 @@ body {
   min-height: 100vh;
 }
 
-/*  HEADER  */
+/*  Encabezado  */
 .app-header {
   background: #1c2b3a;
   color: #e8e0d0;
@@ -181,14 +182,14 @@ body {
   background: #7fc48a;
 }
 
-/*  BODY  */
+/*  Estructura principal  */
 .app-body {
   display: grid;
   grid-template-columns: 280px 1fr;
   overflow: hidden;
 }
 
-/*  SIDEBAR  */
+/*  Barra lateral  */
 .sidebar {
   background: #1e2d3d;
   color: #c8d8e4;
@@ -309,7 +310,7 @@ body {
   border-top: 1px solid #2e4358;
 }
 
-/*  MAIN AREA  */
+/*  Area principal  */
 .main-area {
   background: #faf8f3;
   display: flex;
@@ -542,11 +543,28 @@ body {
   padding: 8px 10px;
 }
 
-.source-name {
+.source-title {
   display: block;
   font-size: 0.78rem;
   color: #1c2b3a;
   line-height: 1.35;
+  font-weight: 700;
+}
+
+.source-meta {
+  display: block;
+  margin-top: 3px;
+  font-size: 0.66rem;
+  color: #6c5f49;
+  line-height: 1.35;
+}
+
+.source-file {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.62rem;
+  color: #8a7a5e;
+  word-break: break-word;
 }
 
 .source-score {
@@ -558,7 +576,7 @@ body {
   text-transform: uppercase;
 }
 
-/*  ERROR MESSAGES  */
+/*  Mensajes de error  */
 .message-row.error .chat-message {
   background: #fff4f4;
   border-color: #e8b0b0;
@@ -569,7 +587,7 @@ body {
   color: #c05050;
 }
 
-/*  SEARCHING INDICATOR  */
+/*  Indicador de busqueda  */
 @keyframes blink {
   0%, 100% { opacity: 1; }
   50%       { opacity: 0.2; }
@@ -585,7 +603,7 @@ body {
   animation: blink 1.2s ease-in-out infinite;
 }
 
-/*  FOOTER  */
+/*  Pie de pagina  */
 .app-footer {
   background: #1c2b3a;
   color: #4a6070;
@@ -598,7 +616,7 @@ body {
 }
 """
 
-# COMPONENTS
+# Componentes de ReactPy.
 
 @component
 def StyleInjector():
@@ -766,9 +784,14 @@ def SourcesPanel(sources):
 
     source_items = [
         html.li(
-            {"className": "source-item", "key": source["name"]},
-            html.span({"className": "source-name"}, source["name"]),
-            html.span({"className": "source-score"}, source["score"]),
+            {"className": "source-item", "key": source["file"]},
+            html.span({"className": "source-title"}, source["title"]),
+            html.span(
+                {"className": "source-meta"},
+                f"Tipo de documento: {source['document_type']}",
+            ),
+            html.span({"className": "source-file"}, f"Archivo: {source['file']}"),
+            html.span({"className": "source-score"}, f"Score: {source['score']}"),
         )
         for source in sources
     ]
@@ -833,6 +856,8 @@ def QueryPanel():
         question = text.strip()
         if not question or loading:
             return
+
+        # Primero pintamos la pregunta; la respuesta y fuentes llegan asincronas.
         user_msg = {"role": "user", "content": question}
         msgs_with_user = messages + [user_msg]
         set_text("")
@@ -846,6 +871,8 @@ def QueryPanel():
     def on_clear(event):
         if loading:
             return
+
+        # Limpiar tambien borra el historial del asistente real.
         set_text("")
         set_messages([])
         set_sources([])

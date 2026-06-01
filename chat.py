@@ -1,18 +1,16 @@
 """
-Terminal Chat Client — Personal Digital Assistant
+Cliente de chat en terminal para el asistente digital.
 
-This is the chat interface for the RAG pipeline. It is provided
-complete — you do not need to modify this file.
+Interfaz simple para probar el pipeline RAG desde consola.
 
-Usage:
+Uso:
     python chat.py
 """
 
 import subprocess
 import os
 
-#Aqui quitamos la funcionn load_config_from_env porq creemos que tener todo centralizado en
-#rag.py nos facilita mas las cosas
+# Dejamos la configuracion centralizada en rag.py para no duplicar logica.
 from rag import Assistant, load_config_from_env
 
 from dotenv import load_dotenv

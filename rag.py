@@ -10,7 +10,7 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from sentence_transformers import SentenceTransformer
 from openai import OpenAI
 
-# Default configs
+# Valores por defecto para levantar el RAG sin pelearse con el entorno.
 DEFAULT_DATA_DIR = "data"
 DEFAULT_EMBEDDING_MODEL = "all-MiniLM-L6-v2"
 DEFAULT_LLM_MODEL = "gpt-4.1-mini"
@@ -26,6 +26,18 @@ DOCUMENT_FOLDERS = {
     "calendar": "calendar",
 }
 
+# Estas reglas hacen que las fuentes se lean bonito en la pagina.
+SOURCE_TYPE_RULES = [
+    ("Codigo-Honor", "Codigo de Honor"),
+    ("Estacionamiento", "Reglamento de Estacionamiento"),
+    ("Practicas", "Reglamento de Practicas Profesionales"),
+    ("Servicio-Social", "Reglamento de Servicio Social"),
+    ("Titulacion", "Reglamento de Titulacion"),
+    ("Trimestral", "Reglamento de Modalidad Trimestral"),
+    ("Institucional", "Reglamento Institucional"),
+    ("Estudiantes", "Reglamento de Estudiantes"),
+]
+
 ENV_OPENAI_API_KEY = "OPENAI_API_KEY"
 ENV_OPENAI_BASE_URL = "OPENAI_BASE_URL"
 ENV_LLM_MODEL = "LLM_MODEL"
@@ -36,7 +48,7 @@ ENV_CHUNK_OVERLAP = "CHUNK_OVERLAP"
 
 
 def load_config_from_env() -> dict[str, str | None]:
-    """Aqui Cargamos la configuracion de las variables de entorno"""
+    """Carga la configuracion desde variables de entorno."""
     return {
         "api_key": os.getenv(ENV_OPENAI_API_KEY),
         "base_url": os.getenv(ENV_OPENAI_BASE_URL),
@@ -55,9 +67,9 @@ def _parse_int_setting(name: str, value: Any) -> int:
         raise ValueError(f"{name} must be an integer; got {value!r}") from exc
     return parsed
 
-#Si una variable no existe se asigna un valor por defecto
+# Si algo no viene en el .env, usamos defaults tranquilos.
 def resolve_config(config: dict[str, Any] | None = None) -> dict[str, Any]:
-    """Resolves runtime configuration with defaults and typed settings."""
+    """Resuelve la configuracion final con tipos y valores por defecto."""
     config = config or {}
 
     resolved = {
@@ -92,13 +104,7 @@ def resolve_config(config: dict[str, Any] | None = None) -> dict[str, Any]:
 
 
 def load_documents(data_dir: str = DEFAULT_DATA_DIR) -> list[Document]:
-    """Loads documents from the personal data folders.
-
-    The collection contains one LangChain Document per `.txt` file in the
-    emails, notes, SMS, and calendar folders. Each document stores the file text
-    as `page_content` and includes metadata for the source file path and
-    document type.
-    """
+    """Carga los .txt del corpus y les agrega metadatos basicos."""
     documents: list[Document] = []
 
     for folder_name, document_type in DOCUMENT_FOLDERS.items():
@@ -129,11 +135,7 @@ def split_documents(
         chunk_size: int = DEFAULT_CHUNK_SIZE,
         chunk_overlap: int = DEFAULT_CHUNK_OVERLAP,
 ) -> list[Document]:
-    """Splits documents into overlapping chunks.
-
-    The resulting chunked Document objects use the configured chunk size and
-    overlap while preserving the original document metadata.
-    """
+    """Parte documentos en chunks con traslape conservando metadatos."""
     # Aqui usamos los valores que llegaron de la configuracion, no numeros fijos.
     text_splitter = RecursiveCharacterTextSplitter(
         chunk_size=chunk_size,
@@ -155,11 +157,7 @@ def build_index(
         chunks: list[Document],
         embedding_model: SentenceTransformer,
 ) -> faiss.IndexFlatIP:
-    """Creates a FAISS inner-product index for embedded document chunks.
-
-    The index contains normalized float32 embeddings generated from each
-    chunk's text with the provided embedding model.
-    """
+    """Crea el indice FAISS con embeddings normalizados."""
     if not chunks:
         raise ValueError("Cannot build a FAISS index without chunks")
 
@@ -186,11 +184,7 @@ def retrieve(
         chunks: list[Document],
         k: int = DEFAULT_TOP_K,
 ) -> list[dict]:
-    """Gets the most relevant chunks for a query.
-
-    Results are ordered by similarity and include the chunk text, similarity
-    score, and metadata for each matching chunk.
-    """
+    """Busca los chunks mas cercanos a la pregunta."""
     if not query.strip():
         return []
 
@@ -270,13 +264,63 @@ def build_messages(
     return messages
 
 
-class Assistant:
-    """Stateful RAG assistant.
+def title_from_path(path: str) -> str:
+    """Convierte el nombre del archivo en un titulo mas amable."""
+    filename = os.path.basename(path)
+    title = filename.removesuffix(".txt").removeprefix("CETYS_")
+    return title.replace("-", " ").replace("_", " ")
 
-    The assistant owns the pipeline components, resolved configuration, and
-    conversation history. Questions are answered with retrieved document context
-    and the configured chat model.
-    """
+
+def source_type_from_path(path: str, fallback: str) -> str:
+    """Saca un tipo legible desde el nombre del archivo."""
+    filename = os.path.basename(path)
+    for keyword, label in SOURCE_TYPE_RULES:
+        if keyword in filename:
+            return label
+    return fallback
+
+
+def unique_sources(results: list[dict]) -> list[dict[str, str]]:
+    """Agrupa chunks repetidos para mostrar cada archivo una sola vez."""
+    sources_by_path: dict[str, dict[str, str | float]] = {}
+
+    for result in results:
+        metadata = result["metadata"]
+        path = metadata["path"]
+        score = float(result["score"])
+        current = sources_by_path.get(path)
+
+        # Si el mismo archivo aparece varias veces, nos quedamos con el mejor score.
+        if current is not None and score <= float(current["raw_score"]):
+            continue
+
+        sources_by_path[path] = {
+            "title": title_from_path(path),
+            "document_type": source_type_from_path(path, metadata["document_type"]),
+            "file": os.path.basename(path),
+            "score": f"{score:.3f}",
+            "raw_score": score,
+        }
+
+    ordered_sources = sorted(
+        sources_by_path.values(),
+        key=lambda source: float(source["raw_score"]),
+        reverse=True,
+    )
+
+    return [
+        {
+            "title": str(source["title"]),
+            "document_type": str(source["document_type"]),
+            "file": str(source["file"]),
+            "score": str(source["score"]),
+        }
+        for source in ordered_sources
+    ]
+
+
+class Assistant:
+    """Asistente RAG con indice, modelo, cliente LLM e historial."""
 
     def __init__(
             self,
@@ -296,12 +340,7 @@ class Assistant:
         self.history: list[dict[str, str]] = []
 
     def ask(self, question: str, k: int | None = None) -> str:
-        """Generates an answer from the retrieved context and conversation history.
-
-        The current question is combined with relevant document chunks, previous
-        conversation messages, and the system prompt. The assistant response is
-        appended to history alongside the user message.
-        """
+        """Genera una respuesta usando contexto recuperado e historial."""
         search_k = k or self.top_k
 
         # Antes de responder buscamos que pedazos de documentos tengan relacion con la pregunta
@@ -319,7 +358,7 @@ class Assistant:
         context = format_context(relevant_chunks)
         messages = build_messages(question, context, self.history)
 
-         # Aqui llamamos al LLM 
+        # Aqui llamamos al LLM con el contexto ya armado.
         completion = self.client.chat.completions.create(
             model=self.llm_model,
             messages=messages,
@@ -333,7 +372,6 @@ class Assistant:
 
 
 
-        # guardar historial conversacional
         # guardamos pregunta y respuesta para los siguientes turnos
         self.history.append({"role": "user", "content": question})
         self.history.append({"role": "assistant", "content": answer})
@@ -341,7 +379,7 @@ class Assistant:
         return answer
 
     def ask_with_sources(self, question: str, k: int | None = None) -> tuple[str, list[dict]]:
-        """Like ask() but also returns retrieved source metadata for UI display."""
+        """Responde y regresa las fuentes recuperadas para pintarlas en la UI."""
         search_k = k or self.top_k
         relevant_chunks = retrieve(question, self.index, self.model, self.chunks, search_k)
 
@@ -364,27 +402,15 @@ class Assistant:
         self.history.append({"role": "user", "content": question})
         self.history.append({"role": "assistant", "content": answer})
 
-        sources = [
-            {
-                "name": os.path.basename(c["metadata"]["path"]),
-                "score": f"similitud {c['score']:.3f}",
-            }
-            for c in relevant_chunks
-        ]
-        return answer, sources
+        return answer, unique_sources(relevant_chunks)
 
     def clear_history(self) -> None:
-        """Empties the conversation history."""
+        """Limpia el historial de la conversacion."""
         self.history.clear()
 
     @classmethod
     def from_config(cls, config: dict[str, Any] | None = None) -> Assistant:
-        """Initializes the components required by the assistant and instantiates it
-
-        The pipeline includes resolved configuration, loaded documents, chunked
-        documents, an embedding model, a FAISS index, and an OpenAI-compatible
-        client.
-        """
+        """Inicializa documentos, embeddings, FAISS y cliente LLM."""
         resolved_config = resolve_config(config)
 
         print("Loading documents...")

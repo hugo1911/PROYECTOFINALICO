@@ -10,24 +10,19 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from sentence_transformers import SentenceTransformer
 from openai import OpenAI
 
-# Valores por defecto para levantar el RAG sin pelearse con el entorno.
-DEFAULT_DATA_DIR = "data"
+ DEFAULT_DATA_DIR = "data"
 DEFAULT_EMBEDDING_MODEL = "all-MiniLM-L6-v2"
 DEFAULT_LLM_MODEL = "gpt-4.1-mini"
 DEFAULT_CHUNK_SIZE = 256
 DEFAULT_CHUNK_OVERLAP = 32
 DEFAULT_TOP_K = 4
 
-# Aqui conectamos cada carpeta con el tipo de documento que representa
+ 
 DOCUMENT_FOLDERS = {
-    "emails": "email",
-    "notes": "note",
-    "sms": "sms",
-    "calendar": "calendar",
+    "notes": "reglamento",
 }
 
-# Estas reglas hacen que las fuentes se lean bonito en la pagina.
-SOURCE_TYPE_RULES = [
+ SOURCE_TYPE_RULES = [
     ("Codigo-Honor", "Codigo de Honor"),
     ("Estacionamiento", "Reglamento de Estacionamiento"),
     ("Practicas", "Reglamento de Practicas Profesionales"),
@@ -67,8 +62,7 @@ def _parse_int_setting(name: str, value: Any) -> int:
         raise ValueError(f"{name} must be an integer; got {value!r}") from exc
     return parsed
 
-# Si algo no viene en el .env, usamos defaults tranquilos.
-def resolve_config(config: dict[str, Any] | None = None) -> dict[str, Any]:
+ def resolve_config(config: dict[str, Any] | None = None) -> dict[str, Any]:
     """Resuelve la configuracion final con tipos y valores por defecto."""
     config = config or {}
 
@@ -108,16 +102,13 @@ def load_documents(data_dir: str = DEFAULT_DATA_DIR) -> list[Document]:
     documents: list[Document] = []
 
     for folder_name, document_type in DOCUMENT_FOLDERS.items():
-        # armamos la ruta para encontrar todos los .txt de esa carpeta
-        pattern = os.path.join(data_dir, folder_name, "*.txt")
+         pattern = os.path.join(data_dir, folder_name, "*.txt")
 
         for file_path in sorted(globmod.glob(pattern)):
-            # leemos el archivo completo y lo guardamos como contenido del Document
-            with open(file_path, "r", encoding="utf-8") as file:
+             with open(file_path, "r", encoding="utf-8") as file:
                 text = file.read()
 
-            # guardamos tambien de donde salio y que tipo de documento es
-            documents.append(
+             documents.append(
                 Document(
                     page_content=text,
                     metadata={
@@ -142,11 +133,9 @@ def split_documents(
         chunk_overlap=chunk_overlap,
     )
 
-    # LangChain se encarga de partir el texto y mantener los metadatos en cada chunk.
-    chunks = text_splitter.split_documents(docs)
+     chunks = text_splitter.split_documents(docs)
 
-    # Revisamos rapido que cada pedacito siga sabiendo de que archivo salio:p
-    for chunk in chunks:
+     for chunk in chunks:
         if "path" not in chunk.metadata or "document_type" not in chunk.metadata:
             raise ValueError("Each chunk must preserve path and document_type metadata")
 
@@ -163,14 +152,13 @@ def build_index(
 
     texts = [chunk.page_content for chunk in chunks]
 
-    # Agregamos el embedding model de la configutacion
+ 
     embeddings = embedding_model.encode(
         texts,
         convert_to_numpy=True,
         normalize_embeddings=True,
     ).astype("float32")
-
-    # Como los embeddings ya vienen normalizados usamos producto interno
+ 
     index = faiss.IndexFlatIP(embeddings.shape[1])
     index.add(embeddings)
 
@@ -192,8 +180,7 @@ def retrieve(
         return []
 
     search_k = min(k, len(chunks), index.ntotal)
-
-    # Convertimos la pregunta en embedding para poder compararla contra FAISS
+ 
     query_embedding = model.encode(
         [query],
         convert_to_numpy=True,
@@ -208,8 +195,7 @@ def retrieve(
             continue
 
         chunk = chunks[int(chunk_index)]
-
-        # Regresamos lo q mas importa y es texto, score y metadatos del chunk encontrado
+ 
         results.append(
             {
                 "text": chunk.page_content,
@@ -222,9 +208,10 @@ def retrieve(
 
 
 SYSTEM_PROMPT = (
-    "Eres un asistente personal que responde usando solo el contexto recuperado "
-    "de emails, notas, SMS y calendario. Si el contexto no alcanza para responder, "
-    "debes decir que no tienes suficiente informacion."
+    "Eres un asistente institucional de CETYS Universidad. Respondes usando solo "
+    "el contexto recuperado de los reglamentos y documentos normativos de CETYS. "
+    "Si el contexto no alcanza para responder, debes decir que no tienes "
+    "suficiente informacion en los reglamentos disponibles."
 )
 
 
@@ -248,7 +235,7 @@ def build_messages(
         context: str,
         history: list[dict[str, str]],
 ) -> list[dict[str, str]]:
-    # Juntamos sistema, historial y pregunta actual con su contexto.
+ 
     messages = [{"role": "system", "content": SYSTEM_PROMPT}]
     messages.extend(history)
     messages.append(
@@ -289,8 +276,7 @@ def unique_sources(results: list[dict]) -> list[dict[str, str]]:
         path = metadata["path"]
         score = float(result["score"])
         current = sources_by_path.get(path)
-
-        # Si el mismo archivo aparece varias veces, nos quedamos con el mejor score.
+ 
         if current is not None and score <= float(current["raw_score"]):
             continue
 

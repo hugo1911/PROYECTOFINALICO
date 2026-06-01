@@ -9,6 +9,7 @@ from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from sentence_transformers import SentenceTransformer
 from openai import OpenAI
+import anthropic as anthropic_sdk
 
  DEFAULT_DATA_DIR = "data"
 DEFAULT_EMBEDDING_MODEL = "all-MiniLM-L6-v2"
@@ -40,6 +41,11 @@ ENV_EMBEDDING_MODEL = "EMBEDDING_MODEL"
 ENV_TOP_K = "TOP_K"
 ENV_CHUNK_SIZE = "CHUNK_SIZE"
 ENV_CHUNK_OVERLAP = "CHUNK_OVERLAP"
+ 
+ENV_LLM_PROVIDER = "LLM_PROVIDER"
+ENV_ANTHROPIC_API_KEY = "ANTHROPIC_API_KEY"
+DEFAULT_LLM_PROVIDER = "openai"
+DEFAULT_ANTHROPIC_MODEL = "claude-haiku-4-5-20251001"
 
 
 def load_config_from_env() -> dict[str, str | None]:
@@ -52,6 +58,8 @@ def load_config_from_env() -> dict[str, str | None]:
         "top_k": os.getenv(ENV_TOP_K),
         "chunk_size": os.getenv(ENV_CHUNK_SIZE),
         "chunk_overlap": os.getenv(ENV_CHUNK_OVERLAP),
+        "llm_provider": os.getenv(ENV_LLM_PROVIDER),
+        "anthropic_api_key": os.getenv(ENV_ANTHROPIC_API_KEY),
     }
 
 
@@ -83,6 +91,9 @@ def _parse_int_setting(name: str, value: Any) -> int:
             ENV_CHUNK_OVERLAP,
             config.get("chunk_overlap") or DEFAULT_CHUNK_OVERLAP,
         ),
+    
+        "llm_provider": (config.get("llm_provider") or DEFAULT_LLM_PROVIDER).lower(),
+        "anthropic_api_key": config.get("anthropic_api_key") or None,
     }
 
     if resolved["top_k"] <= 0:
@@ -97,7 +108,7 @@ def _parse_int_setting(name: str, value: Any) -> int:
     return resolved
 
 
- 
+
 NORMATIVE_KEYWORDS = [
     "Reglamento",
     "Codigo-Honor",
@@ -114,9 +125,12 @@ def build_metadata(file_path: str, folder_name: str, document_type: str) -> dict
     a partir del nombre del archivo y la carpeta de origen.
     """
     filename = os.path.basename(file_path)
-     title = filename.removesuffix(".txt").removeprefix("CETYS_").replace("-", " ").replace("_", " ")
-     source_name = filename.removesuffix(".txt")
-     is_regulation = any(kw in filename for kw in NORMATIVE_KEYWORDS)
+   
+    title = filename.removesuffix(".txt").removeprefix("CETYS_").replace("-", " ").replace("_", " ")
+  
+    source_name = filename.removesuffix(".txt")
+    
+    is_regulation = any(kw in filename for kw in NORMATIVE_KEYWORDS)
 
     return {
         "path": file_path,
@@ -155,7 +169,8 @@ def split_documents(
         chunk_overlap: int = DEFAULT_CHUNK_OVERLAP,
 ) -> list[Document]:
     """Parte documentos en chunks con traslape conservando metadatos."""
-     text_splitter = RecursiveCharacterTextSplitter(
+   
+    text_splitter = RecursiveCharacterTextSplitter(
         chunk_size=chunk_size,
         chunk_overlap=chunk_overlap,
     )
@@ -234,6 +249,36 @@ def retrieve(
     return results
 
 
+def _call_anthropic(
+    client: anthropic_sdk.Anthropic,
+    model: str,
+    messages: list[dict[str, str]],
+) -> str:
+    """Llama al SDK oficial de Anthropic y regresa el texto de la respuesta.
+
+    Extrae el system prompt del listado de mensajes para pasarlo como
+    parametro separado, que es como lo espera la Messages API de Anthropic.
+    Fallback: si la respuesta viene vacia regresa el mensaje de sin informacion.
+    """
+    system_content = ""
+    user_messages = []
+    for msg in messages:
+        if msg["role"] == "system":
+            system_content = msg["content"]
+        else:
+            user_messages.append(msg)
+
+    response = client.messages.create(
+        model=model,
+        max_tokens=1024,
+        system=system_content,
+        messages=user_messages,
+    )
+    if response.content and len(response.content) > 0:
+        return response.content[0].text
+    return "No tengo suficiente informacion en los reglamentos disponibles."
+
+
 SYSTEM_PROMPT = (
     "Eres un asistente institucional de CETYS Universidad. Respondes usando solo "
     "el contexto recuperado de los reglamentos y documentos normativos de CETYS. "
@@ -243,7 +288,7 @@ SYSTEM_PROMPT = (
 
 
 def format_context(results: list[dict]) -> str:
-    # Ponemos los chunks recuperados en un formato facil de meter al prompt.
+   
     context_parts = []
 
     for result in results:
@@ -350,13 +395,16 @@ class Assistant:
         self.config = resolve_config(config)
         self.llm_model = self.config["model"]
         self.top_k = self.config["top_k"]
+        self.llm_provider = self.config["llm_provider"]
+        self.anthropic_client: anthropic_sdk.Anthropic | None = None
         self.history: list[dict[str, str]] = []
 
     def ask(self, question: str, k: int | None = None) -> str:
         """Genera una respuesta usando contexto recuperado e historial."""
         search_k = k or self.top_k
 
-         relevant_chunks = retrieve(
+     
+        relevant_chunks = retrieve(
             question,
             self.index,
             self.model,
@@ -370,21 +418,24 @@ class Assistant:
         context = format_context(relevant_chunks)
         messages = build_messages(question, context, self.history)
 
-        # Aqui llamamos al LLM con el contexto ya armado.
-        completion = self.client.chat.completions.create(
-            model=self.llm_model,
-            messages=messages,
-            temperature=0.2,
-        )
-
-        answer = completion.choices[0].message.content
+    
+        if self.llm_provider == "anthropic" and self.anthropic_client is not None:
+            answer = _call_anthropic(self.anthropic_client, self.llm_model, messages)
+        else:
+            completion = self.client.chat.completions.create(
+                model=self.llm_model,
+                messages=messages,
+                temperature=0.2,
+            )
+            answer = completion.choices[0].message.content
 
         if not answer:
             answer = "No tengo suficiente información en los documentos para responder eso."
 
 
 
-         self.history.append({"role": "user", "content": question})
+       
+        self.history.append({"role": "user", "content": question})
         self.history.append({"role": "assistant", "content": answer})
         
         return answer
@@ -400,13 +451,16 @@ class Assistant:
         context = format_context(relevant_chunks)
         msgs = build_messages(question, context, self.history)
 
-        completion = self.client.chat.completions.create(
-            model=self.llm_model,
-            messages=msgs,
-            temperature=0.2,
-        )
-
-        answer = completion.choices[0].message.content
+ 
+        if self.llm_provider == "anthropic" and self.anthropic_client is not None:
+            answer = _call_anthropic(self.anthropic_client, self.llm_model, msgs)
+        else:
+            completion = self.client.chat.completions.create(
+                model=self.llm_model,
+                messages=msgs,
+                temperature=0.2,
+            )
+            answer = completion.choices[0].message.content
         if not answer:
             answer = "No tengo suficiente información en los documentos para responder eso."
 
@@ -449,5 +503,19 @@ class Assistant:
             client_kwargs["base_url"] = resolved_config["base_url"]
         client = OpenAI(**client_kwargs)
 
+
+        instance = cls(index, embedding_model, chunks, client, resolved_config)
+        if resolved_config["llm_provider"] == "anthropic":
+            anthropic_key = resolved_config.get("anthropic_api_key")
+            if anthropic_key:
+                instance.anthropic_client = anthropic_sdk.Anthropic(api_key=anthropic_key)
+                instance.llm_model = resolved_config["model"] or DEFAULT_ANTHROPIC_MODEL
+                print(f"  Proveedor: Anthropic Claude ({instance.llm_model})")
+            else:
+                print("  Advertencia: LLM_PROVIDER=anthropic pero ANTHROPIC_API_KEY no esta configurada.")
+                print("  Fallback: OpenAI")
+        else:
+            print(f"  Proveedor: OpenAI ({instance.llm_model})")
+
         print("Ready!\n")
-        return cls(index, embedding_model, chunks, client, resolved_config)
+        return instance

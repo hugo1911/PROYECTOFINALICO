@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import asyncio
 import os
 import glob as globmod
@@ -124,8 +126,8 @@ CSS = """
 
 body {
   font-family: 'Georgia', 'Times New Roman', serif;
-  background: #f4f1eb;
-  color: #1a1a1a;
+  background: #ffffff;
+  color: #111111;
   min-height: 100vh;
 }
 
@@ -138,13 +140,13 @@ body {
 
 /*  Encabezado  */
 .app-header {
-  background: #1c2b3a;
-  color: #e8e0d0;
+  background: #111111;
+  color: #ffffff;
   padding: 14px 32px;
   display: flex;
   align-items: center;
   gap: 16px;
-  border-bottom: 3px solid #c8a96e;
+  border-bottom: 3px solid #FFD600;
   min-height: 0;
 }
 
@@ -153,7 +155,7 @@ body {
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #e8e0d0;
+  color: #FFD600;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -161,7 +163,7 @@ body {
 
 .app-header .subtitle {
   font-size: 0.78rem;
-  color: #8fa8b8;
+  color: #cccccc;
   font-style: italic;
   letter-spacing: 0.04em;
   white-space: nowrap;
@@ -177,7 +179,7 @@ body {
   font-size: 0.72rem;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: #7fc48a;
+  color: #FFD600;
   white-space: nowrap;
   flex-shrink: 0;
 }
@@ -188,164 +190,108 @@ body {
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: #7fc48a;
+  background: #FFD600;
 }
 
 /*  Estructura principal  */
 .app-body {
   display: grid;
-  grid-template-columns: 280px 1fr;
+  grid-template-columns: 260px 1fr;
   overflow: hidden;
   min-height: 0;
 }
 
-/* Evita que columnas de grid se desborden hacia afuera */
 .app-body > * {
   min-width: 0;
 }
 
 /*  Barra lateral  */
 .sidebar {
-  background: #1e2d3d;
-  color: #c8d8e4;
+  background: #111111;
+  color: #ffffff;
   display: flex;
   flex-direction: column;
-  border-right: 1px solid #2e4358;
+  border-right: 3px solid #FFD600;
   overflow-y: auto;
   min-width: 0;
 }
 
 .sidebar-title {
-  padding: 16px 20px 10px;
+  padding: 18px 20px 12px;
   font-size: 0.62rem;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: #c8a96e;
-  border-bottom: 1px solid #2e4358;
+  color: #FFD600;
+  border-bottom: 1px solid #333333;
+  font-weight: 700;
 }
 
 /*  Resumen de corpus  */
 .corpus-summary {
-  padding: 12px 20px;
-  border-bottom: 1px solid #2e4358;
+  padding: 18px 20px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 14px;
+  flex: 1;
 }
 
 .summary-stat {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: 0.72rem;
+  background: #1e1e1e;
+  border-left: 3px solid #FFD600;
+  padding: 10px 14px;
+  border-radius: 2px;
 }
 
 .summary-stat .label {
-  color: #8fa8b8;
+  font-size: 0.70rem;
+  color: #cccccc;
   letter-spacing: 0.04em;
 }
 
 .summary-stat .value {
-  color: #dce8f0;
+  color: #FFD600;
   font-weight: 700;
-  font-size: 0.85rem;
+  font-size: 1.1rem;
 }
 
 .types-list {
-  margin-top: 6px;
+  margin-top: 4px;
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 5px;
+}
+
+.types-list-label {
+  font-size: 0.58rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #888888;
+  margin-bottom: 4px;
 }
 
 .type-badge {
-  font-size: 0.62rem;
-  color: #7a9ab0;
-  padding: 2px 0;
+  font-size: 0.65rem;
+  color: #eeeeee;
+  padding: 5px 10px;
   letter-spacing: 0.03em;
-  border-left: 2px solid #c8a96e;
-  padding-left: 7px;
+  border-left: 2px solid #FFD600;
+  background: #1a1a1a;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-/*  Lista de documentos  */
-.section-label {
-  padding: 10px 20px 6px;
-  font-size: 0.58rem;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: #5a7a90;
-  border-bottom: 1px solid #253548;
-}
-
-.doc-list {
-  list-style: none;
-  padding: 4px 0;
-  flex: 1;
-}
-
-.doc-item {
-  padding: 9px 20px;
-  border-bottom: 1px solid #1a2838;
-  cursor: default;
-  transition: background 0.12s;
-}
-
-.doc-item:hover {
-  background: #253d52;
-}
-
-.doc-name {
-  font-size: 0.74rem;
-  color: #dce8f0;
-  line-height: 1.35;
-  overflow-wrap: break-word;
-  word-break: break-word;
-}
-
-.doc-meta {
-  display: flex;
-  justify-content: space-between;
-  margin-top: 3px;
-  gap: 6px;
-}
-
-.doc-type {
-  font-size: 0.61rem;
-  color: #7a9ab0;
-  font-style: italic;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.doc-size {
-  font-size: 0.61rem;
-  color: #4a6070;
-  flex-shrink: 0;
-}
-
-.corpus-footer {
-  padding: 10px 20px;
-  font-size: 0.62rem;
-  color: #4a6070;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  border-top: 1px solid #2e4358;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  border-radius: 1px;
 }
 
 /*  Area principal  */
 .main-area {
-  background: #faf8f3;
+  background: #f9f9f9;
   display: flex;
   flex-direction: column;
-  padding: 32px 40px;
-  gap: 24px;
+  padding: 28px 36px;
+  gap: 20px;
   overflow-y: auto;
   min-width: 0;
 }
@@ -354,19 +300,19 @@ body {
   font-size: 0.62rem;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: #8a7a5e;
+  color: #555555;
   margin-bottom: 6px;
 }
 
 .query-box {
-  background: #fff;
-  border: 1px solid #c8bfa8;
-  border-radius: 2px;
+  background: #ffffff;
+  border: 2px solid #FFD600;
+  border-radius: 3px;
   padding: 16px 18px;
   display: flex;
   flex-direction: column;
   gap: 12px;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  box-shadow: 0 2px 8px rgba(255,214,0,0.10);
 }
 
 .query-box textarea {
@@ -375,7 +321,7 @@ body {
   outline: none;
   font-family: 'Georgia', serif;
   font-size: 0.92rem;
-  color: #1a1a1a;
+  color: #111111;
   background: transparent;
   resize: none;
   line-height: 1.6;
@@ -385,7 +331,7 @@ body {
 }
 
 .query-box textarea::placeholder {
-  color: #b0a090;
+  color: #aaaaaa;
   font-style: italic;
 }
 
@@ -399,52 +345,64 @@ body {
 
 .query-hint {
   font-size: 0.7rem;
-  color: #a09080;
+  color: #888888;
   font-style: italic;
 }
 
 .btn-submit {
-  background: #1c2b3a;
-  color: #e8e0d0;
+  background: #FFD600;
+  color: #111111;
   border: none;
-  padding: 9px 22px;
+  padding: 9px 24px;
   font-size: 0.78rem;
+  font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   cursor: pointer;
-  border-radius: 1px;
-  transition: background 0.2s;
+  border-radius: 2px;
+  transition: background 0.18s, transform 0.1s;
   font-family: 'Georgia', serif;
   white-space: nowrap;
 }
 
 .btn-submit:hover {
-  background: #2e4358;
+  background: #e6c200;
+}
+
+.btn-submit:active {
+  transform: scale(0.98);
 }
 
 .btn-submit:disabled {
-  background: #8a8170;
+  background: #dddddd;
+  color: #999999;
   cursor: not-allowed;
 }
 
 .btn-secondary {
   background: transparent;
-  color: #6c5f49;
-  border: 1px solid #c8bfa8;
+  color: #555555;
+  border: 1px solid #cccccc;
   padding: 8px 14px;
   font-size: 0.72rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   cursor: pointer;
-  border-radius: 1px;
-  transition: background 0.2s, color 0.2s;
+  border-radius: 2px;
+  transition: background 0.18s, color 0.18s, border-color 0.18s;
   font-family: 'Georgia', serif;
   white-space: nowrap;
 }
 
 .btn-secondary:hover {
-  background: #f4f1eb;
-  color: #1c2b3a;
+  background: #FFD600;
+  color: #111111;
+  border-color: #FFD600;
+}
+
+.btn-secondary:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
 }
 
 .input-actions {
@@ -455,11 +413,12 @@ body {
 
 .response-area {
   flex: 1;
-  background: #fff;
-  border: 1px solid #c8bfa8;
-  border-radius: 2px;
+  background: #ffffff;
+  border: 1px solid #e8e8e8;
+  border-top: 3px solid #FFD600;
+  border-radius: 3px;
   padding: 24px 28px;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  box-shadow: 0 1px 6px rgba(0,0,0,0.05);
   display: flex;
   flex-direction: column;
   min-width: 0;
@@ -488,25 +447,26 @@ body {
 .chat-message {
   max-width: 72%;
   min-width: 0;
-  border: 1px solid #d8ccb3;
-  padding: 12px 14px;
+  padding: 12px 16px;
   line-height: 1.55;
   font-size: 0.88rem;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
   overflow-wrap: break-word;
   word-break: break-word;
   white-space: pre-wrap;
+  border-radius: 3px;
 }
 
 .message-row.user .chat-message {
-  background: #1c2b3a;
-  border-color: #1c2b3a;
-  color: #e8e0d0;
+  background: #111111;
+  color: #ffffff;
+  border-left: 3px solid #FFD600;
 }
 
 .message-row.assistant .chat-message {
-  background: #fbfaf7;
-  color: #2d2922;
+  background: #fffde6;
+  color: #111111;
+  border-left: 3px solid #FFD600;
+  border: 1px solid #FFD600;
 }
 
 .message-label {
@@ -515,12 +475,16 @@ body {
   font-size: 0.58rem;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: #8a7a5e;
+  color: #888888;
   white-space: nowrap;
 }
 
 .message-row.user .message-label {
-  color: #c8a96e;
+  color: #FFD600;
+}
+
+.message-row.assistant .message-label {
+  color: #b89a00;
 }
 
 .response-placeholder {
@@ -537,7 +501,7 @@ body {
   font-size: 0.68rem;
   letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: #c8bfa8;
+  color: #cccccc;
 }
 
 .response-placeholder .desc {
@@ -545,19 +509,20 @@ body {
   font-style: italic;
   max-width: 320px;
   line-height: 1.6;
-  color: #b0a090;
+  color: #aaaaaa;
 }
 
 .divider-ornament {
   width: 40px;
-  height: 1px;
-  background: #c8bfa8;
+  height: 2px;
+  background: #FFD600;
   margin: 4px auto;
+  border-radius: 1px;
 }
 
 .sources-panel {
   margin-top: 18px;
-  border-top: 1px solid #e0d6c4;
+  border-top: 1px solid #eeeeee;
   padding-top: 14px;
 }
 
@@ -565,13 +530,13 @@ body {
   font-size: 0.62rem;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: #8a7a5e;
+  color: #555555;
   margin-bottom: 8px;
 }
 
 .sources-empty {
   font-size: 0.78rem;
-  color: #b0a090;
+  color: #aaaaaa;
   font-style: italic;
 }
 
@@ -582,16 +547,17 @@ body {
 }
 
 .source-item {
-  border-left: 3px solid #c8a96e;
-  background: #fbfaf7;
-  padding: 8px 10px;
+  border-left: 3px solid #FFD600;
+  background: #fffde6;
+  padding: 8px 12px;
   min-width: 0;
+  border-radius: 0 2px 2px 0;
 }
 
 .source-title {
   display: block;
   font-size: 0.78rem;
-  color: #1c2b3a;
+  color: #111111;
   line-height: 1.35;
   font-weight: 700;
   overflow-wrap: break-word;
@@ -602,7 +568,7 @@ body {
   display: block;
   margin-top: 3px;
   font-size: 0.66rem;
-  color: #6c5f49;
+  color: #555555;
   line-height: 1.35;
   overflow-wrap: break-word;
 }
@@ -611,7 +577,7 @@ body {
   display: block;
   margin-top: 2px;
   font-size: 0.62rem;
-  color: #8a7a5e;
+  color: #777777;
   word-break: break-all;
 }
 
@@ -619,15 +585,17 @@ body {
   display: block;
   margin-top: 2px;
   font-size: 0.62rem;
-  color: #8a7a5e;
+  color: #b89a00;
   letter-spacing: 0.04em;
   text-transform: uppercase;
+  font-weight: 700;
 }
 
 /*  Mensajes de error  */
 .message-row.error .chat-message {
   background: #fff4f4;
-  border-color: #e8b0b0;
+  border-left: 3px solid #e05050;
+  border: 1px solid #e8b0b0;
   color: #7a2020;
 }
 
@@ -643,40 +611,34 @@ body {
 
 .searching-dot {
   display: inline-block;
-  width: 7px;
-  height: 7px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
-  background: #c8a96e;
+  background: #FFD600;
   margin-right: 8px;
-  animation: blink 1.2s ease-in-out infinite;
+  animation: blink 1.1s ease-in-out infinite;
 }
 
 /*  Pie de pagina  */
 .app-footer {
-  background: #1c2b3a;
-  color: #4a6070;
+  background: #111111;
+  color: #666666;
   font-size: 0.68rem;
   letter-spacing: 0.07em;
   text-align: center;
   padding: 10px 32px;
-  border-top: 1px solid #2e4358;
+  border-top: 2px solid #FFD600;
   text-transform: uppercase;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-/* Boton limpiar conversacion — estado deshabilitado mas claro */
-.btn-secondary:disabled {
-  opacity: 0.38;
-  cursor: not-allowed;
-}
-
 /* ===== RESPONSIVE ===== */
 
 @media (max-width: 900px) {
   .app-body {
-    grid-template-columns: 220px 1fr;
+    grid-template-columns: 210px 1fr;
   }
   .main-area {
     padding: 20px 24px;
@@ -750,11 +712,41 @@ def StyleInjector():
 
 @component
 def AppHeader():
+    cetys_logo = html.svg(
+        {
+            "viewBox": "0 0 160 48",
+            "width": "140",
+            "height": "42",
+            "xmlns": "http://www.w3.org/2000/svg",
+            "style": {"marginLeft": "auto", "flexShrink": "0"},
+        },
+        html.rect({"x": "0", "y": "0", "width": "160", "height": "48", "rx": "3", "fill": "#FFD600"}),
+        html.text(
+            {"x": "12", "y": "30", "fontFamily": "Georgia, serif", "fontWeight": "900",
+             "fontSize": "26", "fill": "#111111", "letterSpacing": "2"},
+            "CETYS",
+        ),
+        html.text(
+            {"x": "12", "y": "43", "fontFamily": "Georgia, serif", "fontWeight": "400",
+             "fontSize": "10", "fill": "#333333", "letterSpacing": "3"},
+            "UNIVERSIDAD",
+        ),
+        html.rect({"x": "108", "y": "8", "width": "3", "height": "32", "fill": "#111111"}),
+        html.text(
+            {"x": "116", "y": "24", "fontFamily": "Georgia, serif", "fontWeight": "700",
+             "fontSize": "8", "fill": "#111111", "letterSpacing": "0.5"},
+            "Asistente",
+        ),
+        html.text(
+            {"x": "116", "y": "35", "fontFamily": "Georgia, serif", "fontWeight": "400",
+             "fontSize": "8", "fill": "#333333", "letterSpacing": "0.5"},
+            "RAG",
+        ),
+    )
     return html.header(
         {"className": "app-header"},
         html.h1({}, "Asistente RAG — CETYS"),
-        html.span({"className": "subtitle"}, "Consulta de documentos institucionales"),
-        html.span({"className": "status-dot"}, "Backend: online"),
+        cetys_logo,
     )
 
 
@@ -776,7 +768,11 @@ def CorpusSummary(total, types):
             html.span({"className": "label"}, "Tipos detectados"),
             html.span({"className": "value"}, str(len(types))),
         ),
-        html.div({"className": "types-list"}, *type_badges),
+        html.div(
+            {"className": "types-list"},
+            html.div({"className": "types-list-label"}, "Tipos en corpus"),
+            *type_badges,
+        ),
     )
 
 
@@ -805,33 +801,17 @@ def Sidebar():
     if summary is None:
         return html.aside(
             {"className": "sidebar"},
-            html.div({"className": "sidebar-title"}, "Corpus — Documentos"),
+            html.div({"className": "sidebar-title"}, "Corpus"),
             html.div(
-                {"style": {"padding": "20px", "fontSize": "0.75rem", "color": "#5a7a90"}},
+                {"style": {"padding": "20px", "fontSize": "0.75rem", "color": "#888888"}},
                 "Cargando corpus...",
             ),
         )
 
-    doc_items = [
-        DocItem(
-            key=d["path"],
-            name=d["name"],
-            doc_type=d["type"],
-            size_kb=d["size_kb"],
-        )
-        for d in summary["docs"]
-    ]
-
     return html.aside(
         {"className": "sidebar"},
-        html.div({"className": "sidebar-title"}, "Corpus — Documentos"),
+        html.div({"className": "sidebar-title"}, "Corpus"),
         CorpusSummary(total=summary["total"], types=summary["types"]),
-        html.div({"className": "section-label"}, "Reglamentos indexados"),
-        html.ul({"className": "doc-list"}, *doc_items),
-        html.div(
-            {"className": "corpus-footer"},
-            f"Directorio: {DATA_DIR}",
-        ),
     )
 
 
@@ -929,7 +909,7 @@ def SourcesPanel(sources):
 
 @component
 def InputControls(text, on_change, on_submit, on_clear, has_messages, loading):
-    hint = "Buscando en documentos CETYS..." if loading else "Asistente RAG conectado"
+    hint = "Buscando en documentos CETYS..." if loading else ""
 
     clear_disabled = loading or (not has_messages and not text.strip())
 
@@ -1038,10 +1018,7 @@ def QueryPanel():
 
 @component
 def AppFooter():
-    return html.footer(
-        {"className": "app-footer"},
-        "PROYECTOFINALICO — Inteligencia Computacional — CETYS Universidad",
-    )
+    return html.footer({"className": "app-footer"})
 
 
 @component

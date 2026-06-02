@@ -7,6 +7,9 @@ import re
 from collections import Counter, defaultdict
 from typing import Any
 
+from dotenv import load_dotenv
+load_dotenv()
+
 from langchain_core.documents import Document
 from openai import OpenAI
 
